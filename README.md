@@ -1,6 +1,6 @@
 # LangPic
 
-Android app for young children to learn words in English and Japanese. Shows a word with two images — the child taps the matching one. TextToSpeech reads each word aloud. Lesson packs are imported from ZIP files.
+Android app for young children to learn words. Displays a prompt word and a grid of images — the child selects the correct ones and presses Check. Supports mixed-language packs (English, Japanese, Polish, etc.) with TextToSpeech read-aloud. Lesson packs are imported from ZIP files.
 
 ## Prerequisites
 
@@ -43,23 +43,67 @@ mypack.zip
 ```json
 {
   "title": "My Pack",
-  "language": "en",
   "items": [
     {
-      "word": "dog",
-      "language": "en",
-      "correctImage": "images/dog.png",
-      "wrongImage": "images/cat.png"
+      "word1": "dog",
+      "language1": "en",
+      "word2": "pies",
+      "language2": "pl",
+      "images": [
+        { "path": "images/dog.png", "correct": true },
+        { "path": "images/cat.png", "correct": false }
+      ]
+    },
+    {
+      "word1": "What color is the sky?",
+      "language1": "en",
+      "word2": "Blue!",
+      "images": []
+    },
+    {
+      "word1": "Find all the fruits",
+      "language1": "en",
+      "word2": "Apple and banana!",
+      "images": [
+        { "path": "images/apple.png", "correct": true },
+        { "path": "images/car.png",   "correct": false },
+        { "path": "images/banana.png","correct": true }
+      ]
     }
   ]
 }
 ```
 
-- `language` at the pack level is optional and acts as a default for items that don't specify their own.
-- Each item can override `language` (e.g. `"ja"` for Japanese), so a single pack can mix languages.
-- Image paths are relative to the ZIP root.
+### Fields
 
-Import the ZIP via the **Import Pack** button in the app.
+| Field | Required | Description |
+|---|---|---|
+| `title` | No | Pack display name |
+| `items[].word1` | Yes | Prompt word (TTS spoken in `language1`) |
+| `items[].language1` | No | Locale for word1 (defaults to pack-level `language`) |
+| `items[].word2` | No | Answer word shown after answering (TTS spoken in `language2`) |
+| `items[].language2` | No | Locale for word2 (defaults to `language1`) |
+| `items[].images[]` | No | Array of `{ "path", "correct" }` — paths relative to ZIP root |
+
+### Game behavior per item
+
+| Images | Behavior |
+|---|---|
+| 1 correct + distractors | Tap images to select, press **Check** to submit |
+| Multiple correct | Tap to toggle each, press **Check** — all correct must be selected |
+| None | Press **Check** to reveal word2 |
+
+- Wrong or missed answers are re-queued until answered correctly.
+- A helper character bounces at the bottom. After 5 seconds of inactivity it picks a correct image and gives a directional hint with a chat bubble.
+- Score is shown as correct / total unique items.
+
+Import the ZIP via the **Import Pack** button in the app. Duplicate titles are detected and warned about.
+
+## Example pack
+
+A sample manifest is at `data/manifest.json` with matching images in `data/images/`. Zip the `data/` folder and import it to test.
+
+The full example spec is at `example.manifest.json`.
 
 ## Project structure
 

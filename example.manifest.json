@@ -1,36 +1,33 @@
 {
-  "title": "Test Pack EN-JA-PL",
-  "description": "Simple child-friendly word-image matching pack",
+  "title": "Example Pack",
+  "language": "en",
   "items": [
     {
       "word1": "dog",
       "language1": "en",
-	  "word2": "pies",
-	  "language2": "pl",
-      "correctImage": "images/dog.png",
-	  "correctImage": "images/dog2.png",
-      "wrongImage": "images/cat.png"
+      "word2": "pies",
+      "language2": "pl",
+      "images": [
+        { "path": "images/dog.png", "correct": true },
+        { "path": "images/cat.png", "correct": false },
+        { "path": "images/bird.png", "correct": false }
+      ]
     },
     {
-      "word1": "cat",
+      "word1": "Find all the fruits",
       "language1": "en",
-	  "word2": "kot",
-	  "language2": "pl",
-      "correctImage": "images/cat.png",
-      "wrongImage": "images/dog.png",
-	  "wrongImage": "images/chicken.png"
+      "word2": "Apple and banana are fruits!",
+      "images": [
+        { "path": "images/apple.png", "correct": true },
+        { "path": "images/car.png", "correct": false },
+        { "path": "images/banana.png", "correct": true }
+      ]
     },
     {
-      "word1": "犬",
-      "language1": "ja",
-      "correctImage": "images/inu.png",
-      "wrongImage": "images/neko.png"
-    },
-    {
-      "word1": "猫",
-      "language1": "ja",
-      "correctImage": "images/neko.png",
-      "wrongImage": "images/inu.png"
+      "word1": "What color is the sky?",
+      "language1": "en",
+      "word2": "The sky is blue!",
+      "images": []
     }
   ]
 }

@@ -52,16 +52,14 @@ object ZipImporter {
                 return Result.failure(it)
             }
 
+            // Validate all referenced images exist in the ZIP
             for (item in manifest.items) {
-                if (!imageEntries.containsKey(item.correctImage)) {
-                    return Result.failure(
-                        IllegalArgumentException("Missing image: ${item.correctImage}")
-                    )
-                }
-                if (!imageEntries.containsKey(item.wrongImage)) {
-                    return Result.failure(
-                        IllegalArgumentException("Missing image: ${item.wrongImage}")
-                    )
+                for (img in item.images) {
+                    if (!imageEntries.containsKey(img.path)) {
+                        return Result.failure(
+                            IllegalArgumentException("Missing image: ${img.path}")
+                        )
+                    }
                 }
             }
 
@@ -78,10 +76,11 @@ object ZipImporter {
             val items = manifest.items.map { item ->
                 LessonItem(
                     packId = 0,
-                    word = item.word,
-                    language = item.language,
-                    correctImagePath = item.correctImage,
-                    wrongImagePath = item.wrongImage,
+                    word1 = item.word1,
+                    language1 = item.language1,
+                    word2 = item.word2,
+                    language2 = item.language2,
+                    images = item.images,
                 )
             }
 

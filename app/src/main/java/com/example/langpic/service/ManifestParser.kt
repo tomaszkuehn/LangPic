@@ -1,6 +1,6 @@
 package com.example.langpic.service
 
-import com.example.langpic.domain.model.LessonItem
+import com.example.langpic.domain.model.ImageChoice
 import org.json.JSONObject
 
 data class ManifestData(
@@ -10,10 +10,11 @@ data class ManifestData(
 )
 
 data class ManifestItem(
-    val word: String,
-    val language: String,
-    val correctImage: String,
-    val wrongImage: String,
+    val word1: String,
+    val language1: String,
+    val word2: String,
+    val language2: String,
+    val images: List<ImageChoice>,
 )
 
 object ManifestParser {
@@ -27,11 +28,36 @@ object ManifestParser {
 
             val items = (0 until itemsArray.length()).map { i ->
                 val item = itemsArray.getJSONObject(i)
+                val lang1 = item.optString("language1", language)
+                val lang2 = item.optString("language2", lang1)
+
+                val images = if (item.has("images")) {
+                    val imagesArray = item.getJSONArray("images")
+                    (0 until imagesArray.length()).map { j ->
+                        val img = imagesArray.getJSONObject(j)
+                        ImageChoice(
+                            path = img.getString("path"),
+                            isCorrect = img.getBoolean("correct"),
+                        )
+                    }
+                } else {
+                    // Legacy format: correctImage + wrongImage as single strings
+                    val list = mutableListOf<ImageChoice>()
+                    if (item.has("correctImage")) {
+                        list.add(ImageChoice(item.getString("correctImage"), true))
+                    }
+                    if (item.has("wrongImage")) {
+                        list.add(ImageChoice(item.getString("wrongImage"), false))
+                    }
+                    list.ifEmpty { emptyList() }
+                }
+
                 ManifestItem(
-                    word = item.getString("word"),
-                    language = item.optString("language", language),
-                    correctImage = item.getString("correctImage"),
-                    wrongImage = item.getString("wrongImage"),
+                    word1 = item.getString("word1"),
+                    language1 = lang1,
+                    word2 = item.optString("word2", ""),
+                    language2 = lang2,
+                    images = images,
                 )
             }
 

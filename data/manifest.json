@@ -1,0 +1,53 @@
+{
+  "title": "Test Pack EN-JA-PL",
+  "description": "Simple child-friendly word-image matching pack",
+  "items": [
+    {
+      "word1": "dog",
+      "language1": "en",
+      "word2": "pies",
+      "language2": "pl",
+      "images": [
+        { "path": "images/dog.png", "correct": true },
+        { "path": "images/dog2.PNG", "correct": true },
+        { "path": "images/cat.png", "correct": false }
+      ]
+    },
+    {
+      "word1": "cat",
+      "language1": "en",
+      "word2": "kot",
+      "language2": "pl",
+      "images": [
+        { "path": "images/cat.png", "correct": true },
+        { "path": "images/dog.png", "correct": false },
+        { "path": "images/chicken.PNG", "correct": false }
+      ]
+    },
+    {
+      "word1": "cat",
+      "language1": "en",
+      "word2": "kot",
+      "language2": "pl",
+      "images": []
+    },
+    {
+      "word1": "犬",
+      "language1": "ja",
+      "images": [
+        { "path": "images/inu.png", "correct": true },
+        { "path": "images/neko.png", "correct": false }
+      ]
+    },
+    {
+      "word1": "猫",
+      "language1": "ja",
+      "word2": "ねこ",
+      "language2": "ja",
+      "images": [
+        { "path": "images/neko.png", "correct": true },
+        { "path": "images/inu.png", "correct": false }
+      ]
+    }
+  ]
+}

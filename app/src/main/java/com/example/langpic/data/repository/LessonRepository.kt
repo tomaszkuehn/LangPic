@@ -4,12 +4,14 @@ import com.example.langpic.data.dao.LessonItemDao
 import com.example.langpic.data.dao.LessonPackDao
 import com.example.langpic.data.entity.LessonItemEntity
 import com.example.langpic.data.entity.LessonPackEntity
+import com.example.langpic.domain.model.ImageChoice
 import com.example.langpic.domain.model.LessonItem
 import com.example.langpic.domain.model.LessonPack
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 class LessonRepository(
     private val packDao: LessonPackDao,
@@ -55,15 +57,7 @@ class LessonRepository(
             )
         ).toInt()
 
-        val entities = items.map { item ->
-            LessonItemEntity(
-                packId = packId,
-                word = item.word,
-                language = item.language,
-                correctImagePath = item.correctImagePath,
-                wrongImagePath = item.wrongImagePath,
-            )
-        }
+        val entities = items.map { it.toEntity(packId) }
         itemDao.insertAll(entities)
         return packId.toLong()
     }
@@ -82,6 +76,8 @@ class LessonRepository(
         return packDao.countByTitle(title)
     }
 
+    // ---- mappers ----
+
     private fun LessonPackEntity.toDomain(itemCount: Int = 0) = LessonPack(
         id = id,
         title = title,
@@ -91,12 +87,45 @@ class LessonRepository(
         itemCount = itemCount,
     )
 
-    private fun LessonItemEntity.toDomain() = LessonItem(
-        id = id,
-        packId = packId,
-        word = word,
-        language = language,
-        correctImagePath = correctImagePath,
-        wrongImagePath = wrongImagePath,
-    )
+    private fun LessonItemEntity.toDomain(): LessonItem {
+        val images = try {
+            val arr = JSONArray(imagesJson)
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                ImageChoice(
+                    path = obj.getString("path"),
+                    isCorrect = obj.getBoolean("correct"),
+                )
+            }
+        } catch (_: Exception) {
+            emptyList()
+        }
+        return LessonItem(
+            id = id,
+            packId = packId,
+            word1 = word1,
+            language1 = language1,
+            word2 = word2,
+            language2 = language2,
+            images = images,
+        )
+    }
+
+    private fun LessonItem.toEntity(packId: Int): LessonItemEntity {
+        val arr = JSONArray()
+        for (img in images) {
+            arr.put(JSONObject().apply {
+                put("path", img.path)
+                put("correct", img.isCorrect)
+            })
+        }
+        return LessonItemEntity(
+            packId = packId,
+            word1 = word1,
+            language1 = language1,
+            word2 = word2,
+            language2 = language2,
+            imagesJson = arr.toString(),
+        )
+    }
 }
