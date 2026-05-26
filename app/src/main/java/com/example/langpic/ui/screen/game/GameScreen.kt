@@ -269,23 +269,7 @@ fun GameScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // ---- Check button ----
-                    if (state.feedback == Feedback.NONE) {
-                        val canCheck = state.shuffledImages.isEmpty() || state.selectedIndices.isNotEmpty()
-                        Button(
-                            onClick = { viewModel.checkAnswer() },
-                            enabled = canCheck,
-                            modifier = Modifier.fillMaxWidth().height(48.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        ) {
-                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(22.dp))
-                            Spacer(modifier = Modifier.size(6.dp))
-                            Text("Check", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    // ---- Word2 reveal (above feedback) ----
+                    // ---- Word2 reveal ----
                     AnimatedVisibility(visible = state.showingAnswer && item.word2.isNotEmpty()) {
                         Box(
                             modifier = Modifier
@@ -305,11 +289,62 @@ fun GameScreen(
                         }
                     }
 
+                    // ---- Check button / self-assessment ----
+                    if (state.feedback == Feedback.NONE) {
+                        if (state.showSelfAssessment) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("How well did you remember?", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                SelfAssessButton(
+                                    emoji = "😢", label = "not really",
+                                    color = ErrorRed,
+                                    onClick = { viewModel.selfAssess(0f) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                SelfAssessButton(
+                                    emoji = "😐", label = "sort of",
+                                    color = Color(0xFFFFA726),
+                                    onClick = { viewModel.selfAssess(0.2f) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                SelfAssessButton(
+                                    emoji = "😊", label = "yes!",
+                                    color = SuccessGreen,
+                                    onClick = {
+                                        val pts = if (showHint) 0.4f else 0.8f
+                                        viewModel.selfAssess(pts)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                        } else {
+                            val canCheck = state.shuffledImages.isEmpty() || state.selectedIndices.isNotEmpty()
+                            Button(
+                                onClick = { viewModel.checkAnswer() },
+                                enabled = canCheck,
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                            ) {
+                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.size(6.dp))
+                                Text("Check", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
                     // ---- Feedback badge ----
-                    when (state.feedback) {
-                        Feedback.CORRECT -> FeedbackBadge("Well done!", SuccessGreen)
-                        Feedback.INCORRECT -> FeedbackBadge("Oops! Look at the green ones.", ErrorRed)
-                        Feedback.NONE -> {}
+                    when {
+                        state.assessmentMessage != null -> {
+                            val bg = if (state.assessmentMessage!!.startsWith("Try")) ErrorRed else SuccessGreen
+                            FeedbackBadge(state.assessmentMessage!!, bg)
+                        }
+                        state.feedback == Feedback.CORRECT -> FeedbackBadge("Well done!", SuccessGreen)
+                        state.feedback == Feedback.INCORRECT -> FeedbackBadge("Oops! Look at the green ones.", ErrorRed)
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
@@ -494,6 +529,27 @@ private fun FeedbackBadge(text: String, color: Color) {
             .padding(horizontal = 20.dp, vertical = 8.dp),
     ) {
         Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+    }
+}
+
+@Composable
+private fun SelfAssessButton(
+    emoji: String,
+    label: String,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(72.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(emoji, fontSize = 28.sp)
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
     }
 }
 

@@ -23,6 +23,8 @@ data class GameUiState(
     val hasContent: Boolean = false,
     val showingAnswer: Boolean = false,
     val hintActive: Boolean = false,
+    val showSelfAssessment: Boolean = false,
+    val assessmentMessage: String? = null,
 )
 
 class GameViewModel : ViewModel() {
@@ -32,10 +34,13 @@ class GameViewModel : ViewModel() {
 
     private var items: List<LessonItem> = emptyList()
     private val queue = ArrayDeque<Int>()
+    private val lateQueue = ArrayDeque<Int>()
     private var currentIdx = -1
     private var requeueCurrent = false
+    private var requeueLate = false
     private var testingMode = 0
     private var wasSwapped = false
+    private val swapDecisions = mutableMapOf<Int, Boolean>() // per-item swap consistency
     private var itemStartTime = 0L
     private var hintWasUsed = false
     private var maxScore = 0f
@@ -45,8 +50,10 @@ class GameViewModel : ViewModel() {
         items = itemList
         maxScore = items.sumOf { if (it.images.isEmpty()) 0.5 else 1.0 }.toFloat()
         queue.clear()
+        lateQueue.clear()
         queue.addAll(items.indices.shuffled())
         awardedItems.clear()
+        swapDecisions.clear()
         if (queue.isEmpty()) {
             _uiState.value = GameUiState(hasContent = false, isFinished = true)
         } else {
@@ -72,11 +79,13 @@ class GameViewModel : ViewModel() {
             .filter { state.shuffledImages[it].isCorrect }
             .toSet()
 
-        val isCorrect = if (correctIndices.isEmpty()) {
-            true
-        } else {
-            state.selectedIndices == correctIndices
+        if (correctIndices.isEmpty()) {
+            // No-image item — show answer first, then self-assessment
+            _uiState.value = state.copy(showSelfAssessment = true, showingAnswer = true)
+            return
         }
+
+        val isCorrect = state.selectedIndices == correctIndices
 
         requeueCurrent = !isCorrect
 
@@ -96,6 +105,40 @@ class GameViewModel : ViewModel() {
         )
     }
 
+    fun selfAssess(points: Float) {
+        val state = _uiState.value
+        if (!state.showSelfAssessment) return
+
+        val alreadyAwarded = awardedItems.contains(currentIdx)
+        val earned = if (!alreadyAwarded && points > 0f) {
+            awardedItems.add(currentIdx)
+            points
+        } else {
+            0f
+        }
+
+        if (earned <= 0f) {
+            requeueLate = true
+        } else {
+            requeueCurrent = false
+        }
+
+        val msg = when {
+            earned <= 0f -> "Try to remember next time!"
+            earned <= 0.2f -> "Getting there!"
+            else -> "Well done!"
+        }
+
+        _uiState.value = state.copy(
+            feedback = Feedback.CORRECT,
+            score = state.score + earned,
+            totalAttempts = state.totalAttempts + 1,
+            showingAnswer = true,
+            showSelfAssessment = false,
+            assessmentMessage = msg,
+        )
+    }
+
     fun setHintActive(active: Boolean) {
         if (active) hintWasUsed = true
         _uiState.value = _uiState.value.copy(hintActive = active)
@@ -105,11 +148,17 @@ class GameViewModel : ViewModel() {
         if (requeueCurrent) {
             queue.addLast(currentIdx)
         }
-        if (queue.isEmpty()) {
-            _uiState.value = _uiState.value.copy(isFinished = true)
-        } else {
+        if (requeueLate) {
+            lateQueue.addLast(currentIdx)
+        }
+        if (queue.isNotEmpty()) {
             currentIdx = queue.removeFirst()
             publishItem()
+        } else if (lateQueue.isNotEmpty()) {
+            currentIdx = lateQueue.removeFirst()
+            publishItem()
+        } else {
+            _uiState.value = _uiState.value.copy(isFinished = true)
         }
     }
 
@@ -121,6 +170,7 @@ class GameViewModel : ViewModel() {
         awardedItems.clear()
         _uiState.value = GameUiState(totalItems = items.size)
         queue.clear()
+        lateQueue.clear()
         queue.addAll(items.indices.shuffled())
         if (queue.isNotEmpty()) {
             currentIdx = queue.removeFirst()
@@ -130,10 +180,6 @@ class GameViewModel : ViewModel() {
 
     private fun calculatePoints(correctCount: Int, hinted: Boolean): Float {
         return when {
-            correctCount == 0 -> {
-                val elapsed = (System.currentTimeMillis() - itemStartTime) / 1000f
-                if (elapsed < 8f) 0.5f else 0.3f
-            }
             hinted -> if (correctCount == 1) 0.3f else 0.8f
             else -> 1.0f
         }
@@ -141,7 +187,9 @@ class GameViewModel : ViewModel() {
 
     private fun publishItem() {
         val rawItem = items[currentIdx]
-        val doSwap = testingMode == 1 && rawItem.word2.isNotEmpty() && kotlin.random.Random.nextBoolean()
+        val doSwap = testingMode == 1 && rawItem.word2.isNotEmpty() && (
+            swapDecisions.getOrPut(currentIdx) { kotlin.random.Random.nextBoolean() }
+        )
         wasSwapped = doSwap
         val swapped = if (doSwap) {
             rawItem.copy(
@@ -156,6 +204,8 @@ class GameViewModel : ViewModel() {
         val shuffled = swapped.images.shuffled()
         itemStartTime = System.currentTimeMillis()
         hintWasUsed = false
+        requeueCurrent = false
+        requeueLate = false
         _uiState.value = _uiState.value.copy(
             currentItem = swapped,
             shuffledImages = shuffled,
@@ -164,9 +214,11 @@ class GameViewModel : ViewModel() {
             feedback = Feedback.NONE,
             showingAnswer = false,
             hintActive = false,
+            showSelfAssessment = false,
+            assessmentMessage = null,
             totalItems = items.size,
             maxPossibleScore = maxScore,
-            remainingCount = queue.size,
+            remainingCount = queue.size + lateQueue.size + 1,
         )
     }
 }
