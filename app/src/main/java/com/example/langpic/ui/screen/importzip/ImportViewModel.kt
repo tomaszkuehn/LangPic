@@ -12,6 +12,7 @@ data class ImportUiState(
     val result: ImportResult? = null,
     val error: String? = null,
     val warningTitle: String? = null,
+    val missingLanguages: List<String> = emptyList(),
 )
 
 class ImportViewModel : ViewModel() {
@@ -34,27 +35,24 @@ class ImportViewModel : ViewModel() {
         _uiState.value = ImportUiState(isLoading = true)
     }
 
-    fun setResult(result: ImportResult) {
-        _uiState.value = ImportUiState(result = result)
+    fun setResult(result: ImportResult, missingLanguages: List<String> = emptyList()) {
+        _uiState.value = ImportUiState(result = result, missingLanguages = missingLanguages)
     }
 
     fun setError(message: String) {
         _uiState.value = ImportUiState(error = message)
     }
 
-    /** Show duplicate warning — stash result for later confirmation. */
     fun showDuplicateWarning(title: String, result: ImportResult) {
         pendingResult = result
         _uiState.value = ImportUiState(warningTitle = title)
     }
 
-    /** User cancelled the duplicate warning — reset to initial state. */
     fun cancelDuplicate() {
         pendingResult = null
         _uiState.value = ImportUiState()
     }
 
-    /** User confirmed — return the stashed result for insertion. */
     fun consumePendingResult(): ImportResult? {
         val r = pendingResult
         pendingResult = null

@@ -5,15 +5,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -22,7 +28,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,11 +39,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.langpic.data.repository.LessonRepository
+import com.example.langpic.service.TtsHelper
 import com.example.langpic.service.ZipImporter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -50,6 +57,7 @@ import java.io.File
 fun ImportScreen(
     viewModel: ImportViewModel,
     repository: LessonRepository,
+    ttsHelper: TtsHelper,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -81,6 +89,13 @@ fun ImportScreen(
 
                     extractResult.fold(
                         onSuccess = { importResult ->
+                            // Collect all unique language codes
+                            val allLangs = importResult.items.flatMap { item ->
+                                listOf(item.language1, item.language2)
+                            }.filter { it.isNotEmpty() }.distinct()
+
+                            val missing = allLangs.filter { !ttsHelper.isLanguageAvailable(it) }
+
                             val exists = repository.countByTitle(importResult.title) > 0
                             if (exists) {
                                 viewModel.showDuplicateWarning(importResult.title, importResult)
@@ -91,7 +106,7 @@ fun ImportScreen(
                                     extractedPath = importResult.extractedPath,
                                     items = importResult.items,
                                 )
-                                viewModel.setResult(importResult)
+                                viewModel.setResult(importResult, missing)
                             }
                         },
                         onFailure = { e ->
@@ -154,18 +169,12 @@ fun ImportScreen(
         },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             when {
                 state.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             CircularProgressIndicator()
                             Spacer(modifier = Modifier.height(16.dp))
@@ -182,14 +191,45 @@ fun ImportScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(32.dp),
                     )
-                    Text(
-                        "Imported!",
-                        style = MaterialTheme.typography.headlineLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
+                    Text("Imported!", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("${result.title}", fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text("${result.language} — ${result.itemCount} words", fontSize = 18.sp)
+
+                    // Missing language warning
+                    if (state.missingLanguages.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFFFF3E0), RoundedCornerShape(12.dp))
+                                .border(1.dp, Color(0xFFFF9800), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                        ) {
+                            Icon(
+                                Icons.Filled.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFF9800),
+                                modifier = Modifier.size(20.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text("Missing TTS languages:", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    state.missingLanguages.joinToString(", "),
+                                    fontSize = 13.sp,
+                                    color = Color.Gray,
+                                )
+                                Text(
+                                    "Words in these languages will not be spoken.",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = { viewModel.clearResult() },
@@ -201,11 +241,7 @@ fun ImportScreen(
                 }
 
                 state.error != null -> {
-                    Text(
-                        "Import Failed",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+                    Text("Import Failed", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.error)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(state.error!!, fontSize = 16.sp)
                     Spacer(modifier = Modifier.height(24.dp))
@@ -220,10 +256,7 @@ fun ImportScreen(
 
                 else -> {
                     Spacer(modifier = Modifier.height(48.dp))
-                    Text(
-                        "Select a lesson pack ZIP file to import",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    Text("Select a lesson pack ZIP file to import", style = MaterialTheme.typography.bodyLarge)
                     Spacer(modifier = Modifier.height(32.dp))
                     Button(
                         onClick = { filePicker.launch(arrayOf("application/zip", "application/x-zip-compressed")) },
@@ -231,12 +264,7 @@ fun ImportScreen(
                         shape = RoundedCornerShape(24.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     ) {
-                        Text(
-                            "Choose ZIP File",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondary,
-                        )
+                        Text("Choose ZIP File", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSecondary)
                     }
                 }
             }

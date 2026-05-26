@@ -32,6 +32,7 @@ class GameViewModel : ViewModel() {
     private val queue = ArrayDeque<Int>()
     private var currentIdx = -1
     private var requeueCurrent = false
+    private var testingMode = 0
 
     fun loadItems(itemList: List<LessonItem>) {
         items = itemList
@@ -90,6 +91,10 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    fun setTestingMode(mode: Int) {
+        testingMode = mode
+    }
+
     fun reset() {
         _uiState.value = GameUiState(totalItems = items.size)
         queue.clear()
@@ -101,10 +106,20 @@ class GameViewModel : ViewModel() {
     }
 
     private fun publishItem() {
-        val item = items[currentIdx]
-        val shuffled = item.images.shuffled()
+        val rawItem = items[currentIdx]
+        val swapped = if (testingMode == 1 && rawItem.word2.isNotEmpty() && kotlin.random.Random.nextBoolean()) {
+            rawItem.copy(
+                word1 = rawItem.word2,
+                language1 = rawItem.language2.ifEmpty { rawItem.language1 },
+                word2 = rawItem.word1,
+                language2 = rawItem.language1,
+            )
+        } else {
+            rawItem
+        }
+        val shuffled = swapped.images.shuffled()
         _uiState.value = _uiState.value.copy(
-            currentItem = item,
+            currentItem = swapped,
             shuffledImages = shuffled,
             selectedIndices = emptySet(),
             hasContent = true,

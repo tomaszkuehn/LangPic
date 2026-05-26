@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -68,7 +69,7 @@ import kotlinx.coroutines.delay
 import org.json.JSONArray
 import java.io.File
 
-private const val HINT_DELAY_MS = 5000L
+private const val HINT_DELAY_MS = 8000L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +78,7 @@ fun GameScreen(
     ttsHelper: TtsHelper,
     onBack: () -> Unit,
 ) {
+    var testMode by remember { mutableStateOf(0) }
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showHint by remember { mutableStateOf(false) }
@@ -113,13 +115,17 @@ fun GameScreen(
         viewModel.loadItems(resolved)
     }
 
+    LaunchedEffect(testMode) {
+        viewModel.setTestingMode(testMode)
+    }
+
     LaunchedEffect(state.currentItem) {
         showHint = false
         val item = state.currentItem ?: return@LaunchedEffect
         ttsHelper.speak(item.word1, item.language1)
     }
 
-    LaunchedEffect(state.currentItem, state.feedback) {
+    LaunchedEffect(state.currentItem, state.feedback, state.selectedIndices, testMode) {
         if (state.feedback != Feedback.NONE || state.currentItem == null) {
             showHint = false
             return@LaunchedEffect
@@ -278,6 +284,22 @@ fun GameScreen(
                     }
 
                     Spacer(modifier = Modifier.weight(1f))
+
+                    // ---- Test mode toggle ----
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text("normal", fontSize = 12.sp, color = if (testMode == 0) MaterialTheme.colorScheme.primary else Color.Gray)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        androidx.compose.material3.Switch(
+                            checked = testMode == 1,
+                            onCheckedChange = { testMode = if (it) 1 else 0 },
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("shuffle", fontSize = 12.sp, color = if (testMode == 1) MaterialTheme.colorScheme.primary else Color.Gray)
+                    }
 
                     // ---- Helper character ----
                     HelperCharacter(

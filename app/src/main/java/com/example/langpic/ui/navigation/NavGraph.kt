@@ -48,6 +48,7 @@ fun NavGraph(ttsHelper: TtsHelper) {
             ImportScreen(
                 viewModel = vm,
                 repository = repository,
+                ttsHelper = ttsHelper,
                 onBack = { navController.popBackStack() },
             )
         }
