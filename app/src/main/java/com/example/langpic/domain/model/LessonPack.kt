@@ -7,4 +7,5 @@ data class LessonPack(
     val enabled: Boolean = true,
     val extractedPath: String,
     val itemCount: Int = 0,
+    val highScore: Float = 0f,
 )

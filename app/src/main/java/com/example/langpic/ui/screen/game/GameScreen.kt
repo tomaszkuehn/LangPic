@@ -76,9 +76,11 @@ private const val HINT_DELAY_MS = 8000L
 fun GameScreen(
     viewModel: GameViewModel,
     ttsHelper: TtsHelper,
+    repository: com.example.langpic.data.repository.LessonRepository,
     onBack: () -> Unit,
 ) {
     var testMode by remember { mutableStateOf(0) }
+    var bestHighScore by remember { mutableStateOf(0f) }
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     var showHint by remember { mutableStateOf(false) }
@@ -90,6 +92,12 @@ fun GameScreen(
             hintIndex = if (correct.isNotEmpty()) correct.random() else null
         } else {
             hintIndex = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        repository.getAllPacks().collect { list ->
+            bestHighScore = list.filter { it.enabled }.maxOfOrNull { it.highScore } ?: 0f
         }
     }
 
@@ -140,6 +148,15 @@ fun GameScreen(
         }
     }
 
+    LaunchedEffect(state.isFinished) {
+        if (state.isFinished) {
+            val packIds = repository.getEnabledPackIds()
+            for (id in packIds) {
+                repository.updateHighScore(id, state.score)
+            }
+        }
+    }
+
     LaunchedEffect(state.feedback) {
         if (state.feedback != Feedback.NONE) {
             delay(3000)
@@ -150,7 +167,15 @@ fun GameScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("⭐ ${"%.1f".format(state.normalScore)} / ${state.totalItems}", fontWeight = FontWeight.Bold) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("⭐ ${"%.1f".format(state.score)} / ${"%.1f".format(state.maxPossibleScore)}", fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.width(12.dp))
+                        if (bestHighScore > 0f) {
+                            Text("Best: ${"%.1f".format(bestHighScore)}", fontSize = 15.sp, color = Orange500, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -183,11 +208,8 @@ fun GameScreen(
                 ) {
                     Text("All Done!", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Normal: ${"%.1f".format(state.normalScore)}", fontSize = 22.sp)
-                    if (state.swapScore > 0f) {
-                        Text("Shuffle: ${"%.1f".format(state.swapScore)}", fontSize = 20.sp, color = Color.Gray)
-                    }
-                    Text("of ${state.totalItems} items", fontSize = 16.sp, color = Color.Gray)
+                    Text("You scored ${"%.1f".format(state.score)}", fontSize = 24.sp)
+                    Text("of ${"%.1f".format(state.maxPossibleScore)} max", fontSize = 16.sp, color = Color.Gray)
                     if (state.totalAttempts > 0) {
                         Text("Took ${state.totalAttempts} tries", fontSize = 16.sp, color = Color.Gray)
                     }

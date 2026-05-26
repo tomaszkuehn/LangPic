@@ -39,6 +39,7 @@ fun NavGraph(ttsHelper: TtsHelper) {
             GameScreen(
                 viewModel = vm,
                 ttsHelper = ttsHelper,
+                repository = repository,
                 onBack = { navController.popBackStack() },
             )
         }

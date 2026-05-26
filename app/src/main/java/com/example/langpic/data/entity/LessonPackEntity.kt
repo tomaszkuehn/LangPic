@@ -11,4 +11,5 @@ data class LessonPackEntity(
     val language: String,
     val enabled: Boolean = true,
     val extractedPath: String,
+    val highScore: Float = 0f,
 )

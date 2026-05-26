@@ -113,6 +113,9 @@ private fun PackRow(
         Column(modifier = Modifier.weight(1f)) {
             Text(pack.title, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
             Text("${pack.language} · ${pack.itemCount} words", fontSize = 14.sp)
+            if (pack.highScore > 0f) {
+                Text("Best: ${"%.1f".format(pack.highScore)}", fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+            }
         }
         Switch(checked = pack.enabled, onCheckedChange = onToggle)
         Spacer(modifier = Modifier.width(8.dp))

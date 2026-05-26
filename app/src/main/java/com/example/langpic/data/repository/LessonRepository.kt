@@ -8,11 +8,13 @@ import com.example.langpic.domain.model.ImageChoice
 import com.example.langpic.domain.model.LessonItem
 import com.example.langpic.domain.model.LessonPack
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import org.json.JSONArray
 import org.json.JSONObject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LessonRepository(
     private val packDao: LessonPackDao,
     private val itemDao: LessonItemDao,
@@ -76,6 +78,17 @@ class LessonRepository(
         return packDao.countByTitle(title)
     }
 
+    suspend fun updateHighScore(packId: Int, score: Float) {
+        val pack = packDao.getById(packId) ?: return
+        if (score > pack.highScore) {
+            packDao.update(pack.copy(highScore = score))
+        }
+    }
+
+    suspend fun getEnabledPackIds(): List<Int> {
+        return packDao.getEnabled().map { it.id }
+    }
+
     // ---- mappers ----
 
     private fun LessonPackEntity.toDomain(itemCount: Int = 0) = LessonPack(
@@ -85,6 +98,7 @@ class LessonRepository(
         enabled = enabled,
         extractedPath = extractedPath,
         itemCount = itemCount,
+        highScore = highScore,
     )
 
     private fun LessonItemEntity.toDomain(): LessonItem {

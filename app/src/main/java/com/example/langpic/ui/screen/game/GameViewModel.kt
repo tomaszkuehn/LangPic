@@ -13,9 +13,9 @@ data class GameUiState(
     val currentItem: LessonItem? = null,
     val shuffledImages: List<ImageChoice> = emptyList(),
     val selectedIndices: Set<Int> = emptySet(),
-    val normalScore: Float = 0f,
-    val swapScore: Float = 0f,
+    val score: Float = 0f,
     val totalItems: Int = 0,
+    val maxPossibleScore: Float = 0f,
     val totalAttempts: Int = 0,
     val remainingCount: Int = 0,
     val feedback: Feedback = Feedback.NONE,
@@ -37,11 +37,13 @@ class GameViewModel : ViewModel() {
     private var testingMode = 0
     private var wasSwapped = false
     private var itemStartTime = 0L
-    private var hintWasUsed = false  // latched — stays true once hint appeared for this item
+    private var hintWasUsed = false
+    private var maxScore = 0f
     private val awardedItems = mutableSetOf<Int>()
 
     fun loadItems(itemList: List<LessonItem>) {
         items = itemList
+        maxScore = items.sumOf { if (it.images.isEmpty()) 0.5 else 1.0 }.toFloat()
         queue.clear()
         queue.addAll(items.indices.shuffled())
         awardedItems.clear()
@@ -86,13 +88,9 @@ class GameViewModel : ViewModel() {
             0f
         }
 
-        val newNormal = state.normalScore + if (!wasSwapped) earned else 0f
-        val newSwap = state.swapScore + if (wasSwapped) earned else 0f
-
         _uiState.value = state.copy(
             feedback = if (isCorrect) Feedback.CORRECT else Feedback.INCORRECT,
-            normalScore = newNormal,
-            swapScore = newSwap,
+            score = state.score + earned,
             totalAttempts = state.totalAttempts + 1,
             showingAnswer = true,
         )
@@ -167,6 +165,7 @@ class GameViewModel : ViewModel() {
             showingAnswer = false,
             hintActive = false,
             totalItems = items.size,
+            maxPossibleScore = maxScore,
             remainingCount = queue.size,
         )
     }
