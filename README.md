@@ -89,13 +89,30 @@ mypack.zip
 
 | Images | Behavior |
 |---|---|
-| 1 correct + distractors | Tap images to select, press **Check** to submit |
-| Multiple correct | Tap to toggle each, press **Check** — all correct must be selected |
-| None | Press **Check** to reveal word2 |
+| Any | Tap images to toggle selection, press **Check** to submit — all correct (and no incorrect) must be selected |
+| None | Press **Check** → correct answer shown → self-assess with emojis |
 
-- Wrong or missed answers are re-queued until answered correctly.
-- A helper character bounces at the bottom. After 5 seconds of inactivity it picks a correct image and gives a directional hint with a chat bubble.
-- Score is shown as correct / total unique items.
+### Scoring
+
+| Scenario | Points |
+|---|---|
+| Correct, no hint | 1.0 |
+| Correct with hint, single correct image | 0.3 |
+| Correct with hint, multiple correct images | 0.8 |
+| No-image, self-assess 😊 | 0.8 (0.4 if after hint) |
+| No-image, self-assess 😐 | 0.2 |
+| No-image, self-assess 😢 | 0 — re-queued to very end |
+| Wrong answer | 0 — re-queued |
+| Repeated correct answer | 0 (already awarded) |
+
+Max possible score = (items with images × 1.0) + (items without images × 0.8).
+
+### Other features
+
+- **Helper character** bounces at the bottom. After 8 seconds of inactivity it picks a correct image and shows a directional hint ("top-left one! 👆") with a chat bubble. Using the hint reduces points.
+- **normal / shuffle** toggle at the bottom of the game screen. Shuffle mode randomly swaps `word1` ↔ `word2` per item (languages swap too). The swap decision is sticky — re-queued items keep the same mode.
+- **High scores** per pack — shown in the game top bar and in Manage Packs. Saved automatically when a game finishes.
+- **TTS check** on import — warns if any language in the pack is not supported by the device.
 
 Import the ZIP via the **Import Pack** button in the app. Duplicate titles are detected and warned about.
 
