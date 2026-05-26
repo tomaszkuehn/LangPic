@@ -1,0 +1,130 @@
+Build an Android app in Kotlin using Jetpack Compose for young children.
+
+Goal:
+The app shows one word at a time and exactly two images below it. The child taps one image. If the selected image matches the word, show a happy face. If it does not match, show a sad face and then reveal the correct image. The app must read the displayed word aloud using Android TextToSpeech.
+
+Core requirements:
+1. The app must support words in English and Japanese.
+2. Each word entry must include a language code so the app can choose the correct TTS locale:
+   - English: "en"
+   - Japanese: "ja"
+3. When a word appears, the app should automatically speak it aloud, or provide a speaker button that replays it.
+4. The app must import lesson packs from a ZIP file.
+5. A ZIP pack must contain:
+   - a manifest.json file,
+   - image files referenced by the manifest.
+6. After import, the app must unpack the ZIP locally into app-private storage and store the lesson data in a local database.
+7. The app must allow adding custom words and image pairs by importing new ZIP packs.
+8. The UI must be very simple, colorful, and child-friendly.
+
+Lesson pack format:
+- Use a manifest.json file inside the ZIP.
+- Example structure:
+
+lesson-pack.zip
+├── manifest.json
+├── images/
+│   ├── dog.png
+│   ├── cat.png
+│   ├── apple.png
+│   └── banana.png
+
+Example manifest.json:
+{
+  "title": "Basic words pack",
+  "language": "en",
+  "items": [
+    {
+      "word": "dog",
+      "language": "en",
+      "correctImage": "images/dog.png",
+      "wrongImage": "images/cat.png"
+    },
+    {
+      "word": "apple",
+      "language": "en",
+      "correctImage": "images/apple.png",
+      "wrongImage": "images/banana.png"
+    },
+    {
+      "word": "こんにちは",
+      "language": "ja",
+      "correctImage": "images/hello.png",
+      "wrongImage": "images/bye.png"
+    }
+  ]
+}
+
+Behavior:
+- On each round, show the word in large text.
+- Speak the word using TextToSpeech.
+- Display two image cards in randomized order.
+- When the user taps an image:
+  - if correct, show a happy face and move to the next item after a short delay,
+  - if wrong, show a sad face and reveal the correct image, then move on.
+- Keep score or basic progress if easy to add.
+- The app should be usable offline.
+
+Architecture:
+- Use MVVM.
+- Use a Repository layer.
+- Use Room for local persistence.
+- Use a ViewModel with StateFlow or LiveData.
+- Separate domain models from database entities.
+- Keep ZIP import logic separate from game logic.
+- Keep TTS logic in a dedicated service/helper class.
+
+ZIP handling:
+- Use Android ZIP APIs such as ZipInputStream to read and extract files.
+- Validate that manifest.json exists.
+- Validate that all referenced images exist in the ZIP.
+- Copy extracted files into a persistent app-private directory.
+- Handle import errors gracefully and show user-friendly messages.
+
+TextToSpeech:
+- Initialize TextToSpeech once and release it correctly.
+- Use Locale.ENGLISH for English words.
+- Use Locale.JAPANESE or Locale("ja", "JP") for Japanese words.
+- Before speaking, check whether the language is supported.
+- If the requested language is not available, fall back to the device default or show a clear error state.
+- The app should be able to speak short single words cleanly.
+
+Screens:
+1. Home screen
+   - Play button
+   - Import ZIP button
+   - Manage packs button
+
+2. Game screen
+   - Large word text
+   - Speaker button
+   - Two image choices
+   - Happy/sad feedback area
+   - Next round action
+
+3. Import screen
+   - File picker
+   - Validation result
+   - Imported pack summary
+
+4. Pack management screen
+   - List imported packs
+   - Enable/disable packs
+   - Delete packs
+
+Accessibility and UX:
+- Make buttons large and easy to tap.
+- Use large fonts and high contrast.
+- Add content descriptions for images and controls.
+- Keep all interactions simple and predictable.
+- Avoid clutter and unnecessary navigation.
+
+Implementation details:
+- Provide the full project structure.
+- Generate the main Kotlin files, Compose UI, ViewModels, data models, Room entities, repository classes, ZIP importer, manifest parser, and TTS helper.
+- Include sample manifest parsing code.
+- Include sample UI state models.
+- Include sample testable functions where possible.
+- If full production code is too large, generate a working MVP first and clearly label extension points.
+
+Please produce a clean, modular Android MVP that can be expanded later.
