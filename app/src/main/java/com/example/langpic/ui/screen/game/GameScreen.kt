@@ -128,12 +128,15 @@ fun GameScreen(
     LaunchedEffect(state.currentItem, state.feedback, state.selectedIndices, testMode) {
         if (state.feedback != Feedback.NONE || state.currentItem == null) {
             showHint = false
+            viewModel.setHintActive(false)
             return@LaunchedEffect
         }
         showHint = false
+        viewModel.setHintActive(false)
         delay(HINT_DELAY_MS)
         if (state.feedback == Feedback.NONE && state.currentItem != null) {
             showHint = true
+            viewModel.setHintActive(true)
         }
     }
 
@@ -147,7 +150,7 @@ fun GameScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("⭐ ${state.score} / ${state.totalItems}", fontWeight = FontWeight.Bold) },
+                title = { Text("⭐ ${"%.1f".format(state.normalScore)} / ${state.totalItems}", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
@@ -180,8 +183,12 @@ fun GameScreen(
                 ) {
                     Text("All Done!", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("You got ${state.score} out of ${state.totalItems}!", fontSize = 24.sp)
-                    if (state.totalAttempts > state.score) {
+                    Text("Normal: ${"%.1f".format(state.normalScore)}", fontSize = 22.sp)
+                    if (state.swapScore > 0f) {
+                        Text("Shuffle: ${"%.1f".format(state.swapScore)}", fontSize = 20.sp, color = Color.Gray)
+                    }
+                    Text("of ${state.totalItems} items", fontSize = 16.sp, color = Color.Gray)
+                    if (state.totalAttempts > 0) {
                         Text("Took ${state.totalAttempts} tries", fontSize = 16.sp, color = Color.Gray)
                     }
                     Spacer(modifier = Modifier.height(32.dp))

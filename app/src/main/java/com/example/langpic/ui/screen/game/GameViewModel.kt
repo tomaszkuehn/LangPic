@@ -13,7 +13,8 @@ data class GameUiState(
     val currentItem: LessonItem? = null,
     val shuffledImages: List<ImageChoice> = emptyList(),
     val selectedIndices: Set<Int> = emptySet(),
-    val score: Int = 0,
+    val normalScore: Float = 0f,
+    val swapScore: Float = 0f,
     val totalItems: Int = 0,
     val totalAttempts: Int = 0,
     val remainingCount: Int = 0,
@@ -21,6 +22,7 @@ data class GameUiState(
     val isFinished: Boolean = false,
     val hasContent: Boolean = false,
     val showingAnswer: Boolean = false,
+    val hintActive: Boolean = false,
 )
 
 class GameViewModel : ViewModel() {
@@ -33,11 +35,16 @@ class GameViewModel : ViewModel() {
     private var currentIdx = -1
     private var requeueCurrent = false
     private var testingMode = 0
+    private var wasSwapped = false
+    private var itemStartTime = 0L
+    private var hintWasUsed = false  // latched — stays true once hint appeared for this item
+    private val awardedItems = mutableSetOf<Int>()
 
     fun loadItems(itemList: List<LessonItem>) {
         items = itemList
         queue.clear()
         queue.addAll(items.indices.shuffled())
+        awardedItems.clear()
         if (queue.isEmpty()) {
             _uiState.value = GameUiState(hasContent = false, isFinished = true)
         } else {
@@ -71,12 +78,29 @@ class GameViewModel : ViewModel() {
 
         requeueCurrent = !isCorrect
 
+        val earned = if (isCorrect && !awardedItems.contains(currentIdx)) {
+            val pts = calculatePoints(correctCount = correctIndices.size, hinted = hintWasUsed)
+            awardedItems.add(currentIdx)
+            pts
+        } else {
+            0f
+        }
+
+        val newNormal = state.normalScore + if (!wasSwapped) earned else 0f
+        val newSwap = state.swapScore + if (wasSwapped) earned else 0f
+
         _uiState.value = state.copy(
             feedback = if (isCorrect) Feedback.CORRECT else Feedback.INCORRECT,
-            score = if (isCorrect) state.score + 1 else state.score,
+            normalScore = newNormal,
+            swapScore = newSwap,
             totalAttempts = state.totalAttempts + 1,
             showingAnswer = true,
         )
+    }
+
+    fun setHintActive(active: Boolean) {
+        if (active) hintWasUsed = true
+        _uiState.value = _uiState.value.copy(hintActive = active)
     }
 
     fun nextRound() {
@@ -96,6 +120,7 @@ class GameViewModel : ViewModel() {
     }
 
     fun reset() {
+        awardedItems.clear()
         _uiState.value = GameUiState(totalItems = items.size)
         queue.clear()
         queue.addAll(items.indices.shuffled())
@@ -105,9 +130,22 @@ class GameViewModel : ViewModel() {
         }
     }
 
+    private fun calculatePoints(correctCount: Int, hinted: Boolean): Float {
+        return when {
+            correctCount == 0 -> {
+                val elapsed = (System.currentTimeMillis() - itemStartTime) / 1000f
+                if (elapsed < 8f) 0.5f else 0.3f
+            }
+            hinted -> if (correctCount == 1) 0.3f else 0.8f
+            else -> 1.0f
+        }
+    }
+
     private fun publishItem() {
         val rawItem = items[currentIdx]
-        val swapped = if (testingMode == 1 && rawItem.word2.isNotEmpty() && kotlin.random.Random.nextBoolean()) {
+        val doSwap = testingMode == 1 && rawItem.word2.isNotEmpty() && kotlin.random.Random.nextBoolean()
+        wasSwapped = doSwap
+        val swapped = if (doSwap) {
             rawItem.copy(
                 word1 = rawItem.word2,
                 language1 = rawItem.language2.ifEmpty { rawItem.language1 },
@@ -118,6 +156,8 @@ class GameViewModel : ViewModel() {
             rawItem
         }
         val shuffled = swapped.images.shuffled()
+        itemStartTime = System.currentTimeMillis()
+        hintWasUsed = false
         _uiState.value = _uiState.value.copy(
             currentItem = swapped,
             shuffledImages = shuffled,
@@ -125,6 +165,7 @@ class GameViewModel : ViewModel() {
             hasContent = true,
             feedback = Feedback.NONE,
             showingAnswer = false,
+            hintActive = false,
             totalItems = items.size,
             remainingCount = queue.size,
         )
