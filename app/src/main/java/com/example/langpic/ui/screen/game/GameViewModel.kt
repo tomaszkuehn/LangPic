@@ -48,7 +48,7 @@ class GameViewModel : ViewModel() {
 
     fun loadItems(itemList: List<LessonItem>) {
         items = itemList
-        maxScore = items.sumOf { if (it.images.isEmpty()) 0.5 else 1.0 }.toFloat()
+        maxScore = items.sumOf { if (it.images.isEmpty()) 0.8 else 1.0 }.toFloat()
         queue.clear()
         lateQueue.clear()
         queue.addAll(items.indices.shuffled())
