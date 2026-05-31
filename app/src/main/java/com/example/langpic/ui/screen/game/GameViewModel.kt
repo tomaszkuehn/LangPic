@@ -25,6 +25,8 @@ data class GameUiState(
     val hintActive: Boolean = false,
     val showSelfAssessment: Boolean = false,
     val assessmentMessage: String? = null,
+    val revealedLength: Int = 0,
+    val typewriterEnabled: Boolean = true,
 )
 
 class GameViewModel : ViewModel() {
@@ -139,6 +141,14 @@ class GameViewModel : ViewModel() {
         )
     }
 
+    fun setRevealedLength(length: Int) {
+        _uiState.value = _uiState.value.copy(revealedLength = length)
+    }
+
+    fun setTypewriterEnabled(enabled: Boolean) {
+        _uiState.value = _uiState.value.copy(typewriterEnabled = enabled)
+    }
+
     fun setHintActive(active: Boolean) {
         if (active) hintWasUsed = true
         _uiState.value = _uiState.value.copy(hintActive = active)
@@ -167,8 +177,9 @@ class GameViewModel : ViewModel() {
     }
 
     fun reset() {
+        val currentTypewriter = _uiState.value.typewriterEnabled
         awardedItems.clear()
-        _uiState.value = GameUiState(totalItems = items.size)
+        _uiState.value = GameUiState(totalItems = items.size, revealedLength = 0, typewriterEnabled = currentTypewriter)
         queue.clear()
         lateQueue.clear()
         queue.addAll(items.indices.shuffled())
@@ -216,6 +227,7 @@ class GameViewModel : ViewModel() {
             hintActive = false,
             showSelfAssessment = false,
             assessmentMessage = null,
+            revealedLength = 0,
             totalItems = items.size,
             maxPossibleScore = maxScore,
             remainingCount = queue.size + lateQueue.size + 1,

@@ -60,6 +60,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.langpic.data.database.AppDatabase
 import com.example.langpic.domain.model.ImageChoice
+import com.example.langpic.service.AppPreferences
 import com.example.langpic.service.TtsHelper
 import com.example.langpic.ui.theme.ErrorRed
 import com.example.langpic.ui.theme.Orange500
@@ -83,6 +84,8 @@ fun GameScreen(
     var bestHighScore by remember { mutableStateOf(0f) }
     val state by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val prefs = remember { AppPreferences.getInstance(context) }
+    var typewriterEnabled by remember { mutableStateOf(prefs.typewriterEnabled) }
     var showHint by remember { mutableStateOf(false) }
     var hintIndex by remember { mutableStateOf<Int?>(null) }
 
@@ -127,10 +130,39 @@ fun GameScreen(
         viewModel.setTestingMode(testMode)
     }
 
-    LaunchedEffect(state.currentItem) {
+    // Sync typewriter preference to ViewModel
+    LaunchedEffect(typewriterEnabled) {
+        viewModel.setTypewriterEnabled(typewriterEnabled)
+    }
+
+    // ---- Letter-by-letter reveal animation (max 2 seconds) ----
+    LaunchedEffect(state.currentItem, typewriterEnabled) {
+        val item = state.currentItem ?: return@LaunchedEffect
+        val word = item.word1
+        if (word.isEmpty()) return@LaunchedEffect
+
+        if (typewriterEnabled) {
+            viewModel.setRevealedLength(0)
+            val delayPerChar = (2000L / word.length).coerceIn(30L, 300L)
+
+            for (i in 1..word.length) {
+                delay(delayPerChar)
+                viewModel.setRevealedLength(i)
+            }
+        } else {
+            // Show full word immediately
+            viewModel.setRevealedLength(word.length)
+        }
+    }
+
+    LaunchedEffect(state.currentItem, state.revealedLength) {
         showHint = false
         val item = state.currentItem ?: return@LaunchedEffect
-        ttsHelper.speak(item.word1, item.language1)
+        val word = item.word1
+        // Speak only after the word is fully revealed (or immediately if typewriter disabled)
+        if (state.revealedLength >= word.length) {
+            ttsHelper.speak(item.word1, item.language1)
+        }
     }
 
     LaunchedEffect(state.currentItem, state.feedback, state.selectedIndices, testMode) {
@@ -238,7 +270,10 @@ fun GameScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = item.word1,
+                            text = if (typewriterEnabled)
+                                item.word1.take(state.revealedLength.coerceAtMost(item.word1.length))
+                            else
+                                item.word1,
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
@@ -363,6 +398,25 @@ fun GameScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("shuffle", fontSize = 12.sp, color = if (testMode == 1) MaterialTheme.colorScheme.primary else Color.Gray)
+                    }
+
+                    // ---- Typewriter toggle ----
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text("instant", fontSize = 12.sp, color = if (!typewriterEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        androidx.compose.material3.Switch(
+                            checked = typewriterEnabled,
+                            onCheckedChange = {
+                                typewriterEnabled = it
+                                prefs.typewriterEnabled = it
+                            },
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("typewriter", fontSize = 12.sp, color = if (typewriterEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
                     }
 
                     // ---- Helper character ----
