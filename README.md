@@ -2,6 +2,8 @@
 
 Android app for young children to learn words. Displays a prompt word and a grid of images — the child selects the correct ones and presses Check. Supports mixed-language packs (English, Japanese, Polish, etc.) with TextToSpeech read-aloud. Lesson packs are imported from ZIP files.
 
+<img width="1000" height="986" alt="LangPic" src="https://github.com/user-attachments/assets/9799b056-b67c-4c58-a5b9-0b51cee5605f" />
+
 ## Prerequisites
 
 - **Android Studio** (Hedgehog 2023.1+ or later)
