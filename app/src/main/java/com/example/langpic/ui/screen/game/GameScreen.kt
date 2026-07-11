@@ -1,12 +1,21 @@
+@file:OptIn(
+    ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.layout.ExperimentalLayoutApi::class,
+)
+
 package com.example.langpic.ui.screen.game
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,16 +34,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -49,6 +58,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -62,17 +74,32 @@ import com.example.langpic.data.database.AppDatabase
 import com.example.langpic.domain.model.ImageChoice
 import com.example.langpic.service.AppPreferences
 import com.example.langpic.service.TtsHelper
+import com.example.langpic.ui.theme.Blue400
+import com.example.langpic.ui.theme.CreamBg
+import com.example.langpic.ui.theme.DarkText
 import com.example.langpic.ui.theme.ErrorRed
+import com.example.langpic.ui.theme.ErrorRedLight
+import com.example.langpic.ui.theme.GradientPlayful
+import com.example.langpic.ui.theme.GradientWarm
+import com.example.langpic.ui.theme.MediumText
+import com.example.langpic.ui.theme.Orange100
+import com.example.langpic.ui.theme.Orange300
 import com.example.langpic.ui.theme.Orange500
+import com.example.langpic.ui.theme.Pink400
+import com.example.langpic.ui.theme.Purple400
 import com.example.langpic.ui.theme.SuccessGreen
+import com.example.langpic.ui.theme.SuccessGreenLight
+import com.example.langpic.ui.theme.SurfaceWhite
+import com.example.langpic.ui.theme.Teal200
 import com.example.langpic.ui.theme.Teal400
+import com.example.langpic.ui.theme.Teal50
+import com.example.langpic.ui.theme.WarningAmber
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import java.io.File
 
 private const val HINT_DELAY_MS = 8000L
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameScreen(
     viewModel: GameViewModel,
@@ -88,6 +115,7 @@ fun GameScreen(
     var typewriterEnabled by remember { mutableStateOf(prefs.typewriterEnabled) }
     var showHint by remember { mutableStateOf(false) }
     var hintIndex by remember { mutableStateOf<Int?>(null) }
+    var showCelebration by remember { mutableStateOf(false) }
 
     LaunchedEffect(showHint, state.shuffledImages) {
         if (showHint && state.shuffledImages.isNotEmpty()) {
@@ -114,43 +142,31 @@ fun GameScreen(
                 img.copy(path = File(basePath, img.path).absolutePath)
             }
             com.example.langpic.domain.model.LessonItem(
-                id = entity.id,
-                packId = entity.packId,
-                word1 = entity.word1,
-                language1 = entity.language1,
-                word2 = entity.word2,
-                language2 = entity.language2,
+                id = entity.id, packId = entity.packId,
+                word1 = entity.word1, language1 = entity.language1,
+                word2 = entity.word2, language2 = entity.language2,
                 images = images,
             )
         }
         viewModel.loadItems(resolved)
     }
 
-    LaunchedEffect(testMode) {
-        viewModel.setTestingMode(testMode)
-    }
+    LaunchedEffect(testMode) { viewModel.setTestingMode(testMode) }
+    LaunchedEffect(typewriterEnabled) { viewModel.setTypewriterEnabled(typewriterEnabled) }
 
-    // Sync typewriter preference to ViewModel
-    LaunchedEffect(typewriterEnabled) {
-        viewModel.setTypewriterEnabled(typewriterEnabled)
-    }
-
-    // ---- Letter-by-letter reveal animation (max 2 seconds) ----
+    // ---- Letter-by-letter reveal ----
     LaunchedEffect(state.currentItem, typewriterEnabled) {
         val item = state.currentItem ?: return@LaunchedEffect
         val word = item.word1
         if (word.isEmpty()) return@LaunchedEffect
-
         if (typewriterEnabled) {
             viewModel.setRevealedLength(0)
             val delayPerChar = (2000L / word.length).coerceIn(30L, 300L)
-
             for (i in 1..word.length) {
                 delay(delayPerChar)
                 viewModel.setRevealedLength(i)
             }
         } else {
-            // Show full word immediately
             viewModel.setRevealedLength(word.length)
         }
     }
@@ -158,77 +174,78 @@ fun GameScreen(
     LaunchedEffect(state.currentItem, state.revealedLength) {
         showHint = false
         val item = state.currentItem ?: return@LaunchedEffect
-        val word = item.word1
-        // Speak only after the word is fully revealed (or immediately if typewriter disabled)
-        if (state.revealedLength >= word.length) {
+        if (state.revealedLength >= item.word1.length) {
             ttsHelper.speak(item.word1, item.language1)
         }
     }
 
+    // Hint timer
     LaunchedEffect(state.currentItem, state.feedback, state.selectedIndices, testMode) {
         if (state.feedback != Feedback.NONE || state.currentItem == null) {
-            showHint = false
-            viewModel.setHintActive(false)
-            return@LaunchedEffect
+            showHint = false; viewModel.setHintActive(false); return@LaunchedEffect
         }
-        showHint = false
-        viewModel.setHintActive(false)
+        showHint = false; viewModel.setHintActive(false)
         delay(HINT_DELAY_MS)
         if (state.feedback == Feedback.NONE && state.currentItem != null) {
-            showHint = true
-            viewModel.setHintActive(true)
+            showHint = true; viewModel.setHintActive(true)
         }
     }
 
     LaunchedEffect(state.isFinished) {
         if (state.isFinished) {
             val packIds = repository.getEnabledPackIds()
-            for (id in packIds) {
-                repository.updateHighScore(id, state.score)
-            }
+            for (id in packIds) repository.updateHighScore(id, state.score)
         }
     }
 
+    // Feedback → celebration + auto-advance
     LaunchedEffect(state.feedback) {
+        if (state.feedback == Feedback.CORRECT) {
+            showCelebration = true; delay(1800); showCelebration = false
+        }
         if (state.feedback != Feedback.NONE) {
-            delay(3000)
-            viewModel.nextRound()
+            delay(2800); viewModel.nextRound()
         }
     }
 
+    // ---- Screen layout ----
     Scaffold(
+        containerColor = CreamBg,
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("⭐ ${"%.1f".format(state.score)} / ${"%.1f".format(state.maxPossibleScore)}", fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Text("⭐ ${"%.1f".format(state.score)}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(" / ${"%.1f".format(state.maxPossibleScore)}", fontSize = 14.sp, color = MediumText)
                         if (bestHighScore > 0f) {
-                            Text("Best: ${"%.1f".format(bestHighScore)}", fontSize = 15.sp, color = Orange500, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("🏆 ${"%.1f".format(bestHighScore)}", fontSize = 14.sp, color = Orange500, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
+                    IconButton(onClick = onBack) { Text("←", fontSize = 22.sp, fontWeight = FontWeight.Bold) }
                 },
                 actions = {
                     if (state.hasContent && !state.isFinished) {
-                        Text(
-                            "Left: ${state.remainingCount}",
-                            fontSize = 14.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                        )
+                        Text("${state.remainingCount} left", fontSize = 13.sp, color = MediumText, modifier = Modifier.padding(end = 12.dp))
                     }
                 },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = SurfaceWhite,
+                ),
             )
         },
     ) { padding ->
         when {
             !state.hasContent && !state.isFinished -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No lesson items available. Import a lesson pack first.", fontSize = 18.sp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("📚", fontSize = 56.sp)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text("No lesson items yet.", fontSize = 18.sp, color = MediumText, fontWeight = FontWeight.Medium)
+                        Text("Import a lesson pack to start!", fontSize = 15.sp, color = MediumText)
+                    }
                 }
             }
 
@@ -238,214 +255,234 @@ fun GameScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    Text("All Done!", style = MaterialTheme.typography.headlineLarge, color = MaterialTheme.colorScheme.primary)
+                    Text("🎉", fontSize = 64.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("All Done!", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, color = Orange500)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("You scored ${"%.1f".format(state.score)}", fontSize = 24.sp)
-                    Text("of ${"%.1f".format(state.maxPossibleScore)} max", fontSize = 16.sp, color = Color.Gray)
-                    if (state.totalAttempts > 0) {
-                        Text("Took ${state.totalAttempts} tries", fontSize = 16.sp, color = Color.Gray)
-                    }
-                    Spacer(modifier = Modifier.height(32.dp))
+                    ScoreCard(state.score, state.maxPossibleScore, state.totalAttempts)
+                    Spacer(modifier = Modifier.height(28.dp))
                     Button(
                         onClick = { viewModel.reset() },
-                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
                         shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Orange500),
                     ) {
-                        Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(28.dp))
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Play Again", fontSize = 22.sp)
+                        Text("🔄  Play Again", fontSize = 20.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
             else -> {
                 val item = state.currentItem!!
-                Column(
-                    modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // ---- Word + speaker ----
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center,
+                Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(
-                            text = if (typewriterEnabled)
-                                item.word1.take(state.revealedLength.coerceAtMost(item.word1.length))
-                            else
-                                item.word1,
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
+                        // ---- Progress bar ----
+                        val progress = if (state.totalItems > 0) {
+                            1f - (state.remainingCount.toFloat() / state.totalItems)
+                        } else 0f
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            color = Orange500,
+                            trackColor = Orange100,
                         )
-                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-                            IconButton(
-                                onClick = { ttsHelper.speak(item.word1, item.language1) },
-                                modifier = Modifier.size(44.dp).background(Teal400, CircleShape),
-                            ) {
-                                Icon(Icons.Filled.VolumeUp, contentDescription = "Speak", tint = Color.White, modifier = Modifier.size(26.dp))
-                            }
-                        }
-                    }
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // ---- Image grid ----
-                    if (state.shuffledImages.isNotEmpty()) {
-                        ImageGrid(
-                            images = state.shuffledImages,
-                            selectedIndices = state.selectedIndices,
-                            hintIndex = hintIndex,
-                            feedback = state.feedback,
-                            enabled = state.feedback == Feedback.NONE,
-                            onTap = { viewModel.selectImage(it) },
+                        // ---- Word card ----
+                        WordCard(
+                            word = item.word1,
+                            language = item.language1,
+                            revealedLength = if (typewriterEnabled) state.revealedLength else item.word1.length,
+                            typewriterEnabled = typewriterEnabled,
+                            onSpeakerClick = { ttsHelper.speak(item.word1, item.language1) },
                         )
-                    }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                    // ---- Word2 reveal ----
-                    AnimatedVisibility(visible = state.showingAnswer && item.word2.isNotEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Orange500.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
-                                .border(2.dp, Orange500, RoundedCornerShape(16.dp))
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = item.word2,
-                                fontSize = 22.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Orange500,
-                                textAlign = TextAlign.Center,
+                        // ---- Image grid ----
+                        if (state.shuffledImages.isNotEmpty()) {
+                            ImageGrid(
+                                images = state.shuffledImages,
+                                selectedIndices = state.selectedIndices,
+                                hintIndex = hintIndex,
+                                feedback = state.feedback,
+                                enabled = state.feedback == Feedback.NONE,
+                                onTap = { viewModel.selectImage(it) },
                             )
                         }
-                    }
 
-                    // ---- Check button / self-assessment ----
-                    if (state.feedback == Feedback.NONE) {
-                        if (state.showSelfAssessment) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("How well did you remember?", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                SelfAssessButton(
-                                    emoji = "😢", label = "not really",
-                                    color = ErrorRed,
-                                    onClick = { viewModel.selfAssess(0f) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                SelfAssessButton(
-                                    emoji = "😐", label = "sort of",
-                                    color = Color(0xFFFFA726),
-                                    onClick = { viewModel.selfAssess(0.2f) },
-                                    modifier = Modifier.weight(1f),
-                                )
-                                SelfAssessButton(
-                                    emoji = "😊", label = "yes!",
-                                    color = SuccessGreen,
-                                    onClick = {
-                                        val pts = if (showHint) 0.4f else 0.8f
-                                        viewModel.selfAssess(pts)
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                )
-                            }
-                        } else {
-                            val canCheck = state.shuffledImages.isEmpty() || state.selectedIndices.isNotEmpty()
-                            Button(
-                                onClick = { viewModel.checkAnswer() },
-                                enabled = canCheck,
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                            ) {
-                                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(22.dp))
-                                Spacer(modifier = Modifier.size(6.dp))
-                                Text("Check", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // ---- Word2 reveal ----
+                        AnimatedVisibility(
+                            visible = state.showingAnswer && item.word2.isNotEmpty(),
+                            enter = slideInVertically { it / 2 } + fadeIn(),
+                        ) {
+                            AnswerBubble(word = item.word2, language = item.language2)
+                        }
+
+                        // ---- Check / Self-assess ----
+                        if (state.feedback == Feedback.NONE) {
+                            if (state.showSelfAssessment) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("How well did you remember?", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = DarkText)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    SelfAssessChip("😢", "not really", ErrorRed, 0f, viewModel, Modifier.weight(1f))
+                                    SelfAssessChip("😐", "sort of", WarningAmber, 0.2f, viewModel, Modifier.weight(1f))
+                                    SelfAssessChip("😊", "yes!", SuccessGreen, if (showHint) 0.4f else 0.8f, viewModel, Modifier.weight(1f))
+                                }
+                            } else {
+                                val canCheck = state.shuffledImages.isEmpty() || state.selectedIndices.isNotEmpty()
+                                Button(
+                                    onClick = { viewModel.checkAnswer() },
+                                    enabled = canCheck,
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Teal400),
+                                ) {
+                                    Text("✓  Check", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
-                    }
 
-                    // ---- Feedback badge ----
-                    when {
-                        state.assessmentMessage != null -> {
-                            val bg = if (state.assessmentMessage!!.startsWith("Try")) ErrorRed else SuccessGreen
-                            FeedbackBadge(state.assessmentMessage!!, bg)
+                        // ---- Feedback badge ----
+                        AnimatedVisibility(
+                            visible = state.feedback != Feedback.NONE || state.assessmentMessage != null,
+                            enter = scaleIn(initialScale = 0.5f, animationSpec = tween(300, easing = FastOutSlowInEasing)) + fadeIn(),
+                        ) {
+                            val (text, bg) = when {
+                                state.assessmentMessage != null -> {
+                                    val c = if (state.assessmentMessage!!.startsWith("Try")) ErrorRed else SuccessGreen
+                                    state.assessmentMessage!! to c
+                                }
+                                state.feedback == Feedback.CORRECT -> "⭐  Well done!" to SuccessGreen
+                                else -> "💡  Look at the green ones" to ErrorRed
+                            }
+                            FeedbackPill(text, bg)
                         }
-                        state.feedback == Feedback.CORRECT -> FeedbackBadge("Well done!", SuccessGreen)
-                        state.feedback == Feedback.INCORRECT -> FeedbackBadge("Oops! Look at the green ones.", ErrorRed)
+
+                        Spacer(modifier = Modifier.weight(1f))
                     }
 
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    // ---- Test mode toggle ----
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
+                    // ---- Bottom controls ----
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, SurfaceWhite.copy(alpha = 0.95f))))
+                            .padding(horizontal = 20.dp).padding(bottom = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text("normal", fontSize = 12.sp, color = if (testMode == 0) MaterialTheme.colorScheme.primary else Color.Gray)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        androidx.compose.material3.Switch(
+                        // Toggles
+                        ToggleRow(
+                            leftLabel = "normal", rightLabel = "shuffle",
                             checked = testMode == 1,
-                            onCheckedChange = { testMode = if (it) 1 else 0 },
+                            onToggle = { testMode = if (it) 1 else 0 },
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("shuffle", fontSize = 12.sp, color = if (testMode == 1) MaterialTheme.colorScheme.primary else Color.Gray)
-                    }
-
-                    // ---- Typewriter toggle ----
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        Text("instant", fontSize = 12.sp, color = if (!typewriterEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        androidx.compose.material3.Switch(
+                        Spacer(modifier = Modifier.height(2.dp))
+                        ToggleRow(
+                            leftLabel = "instant", rightLabel = "typewriter",
                             checked = typewriterEnabled,
-                            onCheckedChange = {
+                            onToggle = {
                                 typewriterEnabled = it
                                 prefs.typewriterEnabled = it
                             },
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("typewriter", fontSize = 12.sp, color = if (typewriterEnabled) MaterialTheme.colorScheme.primary else Color.Gray)
+
+                        // Helper character
+                        HelperCharacter(
+                            showHint = showHint,
+                            hintIndex = hintIndex,
+                            images = state.shuffledImages,
+                            cols = if (state.shuffledImages.size <= 4) 2 else 3,
+                            feedback = state.feedback,
+                        )
                     }
 
-                    // ---- Helper character ----
-                    HelperCharacter(
-                        showHint = showHint,
-                        hintIndex = hintIndex,
-                        images = state.shuffledImages,
-                        cols = if (state.shuffledImages.size <= 4) 2 else 3,
-                        feedback = state.feedback,
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
+                    // ---- Celebration overlay ----
+                    if (showCelebration) {
+                        CelebrationOverlay()
+                    }
                 }
             }
         }
     }
 }
 
-// ---- Helpers ----
+// ==================== Sub-composables ====================
 
-private fun parseImages(json: String): List<ImageChoice> {
-    return try {
-        val arr = JSONArray(json)
-        (0 until arr.length()).map { i ->
-            val obj = arr.getJSONObject(i)
-            ImageChoice(path = obj.getString("path"), isCorrect = obj.getBoolean("correct"))
+@Composable
+private fun WordCard(
+    word: String,
+    language: String,
+    revealedLength: Int,
+    typewriterEnabled: Boolean,
+    onSpeakerClick: () -> Unit,
+) {
+    val displayText = if (typewriterEnabled) word.take(revealedLength.coerceAtMost(word.length)) else word
+    val langEmoji = when (language) { "ja" -> "🇯🇵"; "en" -> "🇬🇧"; else -> "🗣️" }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().padding(20.dp), contentAlignment = Alignment.Center) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                // Language flag
+                Box(
+                    modifier = Modifier.size(32.dp).clip(CircleShape).background(Orange100),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(langEmoji, fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Word
+                Text(
+                    text = displayText,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = DarkText,
+                    textAlign = TextAlign.Center,
+                )
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Speaker button
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Teal400, Blue400)))
+                        .clickable { onSpeakerClick() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("🔊", fontSize = 20.sp)
+                }
+            }
+
+            // Typewriter cursor
+            if (typewriterEnabled && revealedLength < word.length) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .offset(x = (-50).dp)
+                        .size(2.dp, 28.dp)
+                        .background(Orange500),
+                )
+            }
         }
-    } catch (_: Exception) {
-        emptyList()
     }
 }
 
@@ -458,10 +495,7 @@ private fun ImageGrid(
     enabled: Boolean,
     onTap: (Int) -> Unit,
 ) {
-    val cols = when {
-        images.size <= 4 -> 2
-        else -> 3
-    }
+    val cols = if (images.size <= 4) 2 else 3
     val rows = images.chunked(cols)
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -473,26 +507,24 @@ private fun ImageGrid(
                 for (img in row) {
                     val idx = images.indexOf(img)
                     Box(modifier = Modifier.weight(1f)) {
-                        ImageCard(
+                        ImageTile(
                             imageChoice = img,
                             isSelected = idx in selectedIndices,
-                            isHinted = idx == hintIndex,
+                            isHinted = idx == hintIndex && enabled,
                             feedback = feedback,
                             enabled = enabled,
                             onClick = { onTap(idx) },
                         )
                     }
                 }
-                repeat(cols - row.size) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
+                repeat(cols - row.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun ImageCard(
+private fun ImageTile(
     imageChoice: ImageChoice,
     isSelected: Boolean,
     isHinted: Boolean,
@@ -500,198 +532,287 @@ private fun ImageCard(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val borderColor = when {
-        feedback == Feedback.NONE && isSelected -> Orange500
-        feedback == Feedback.NONE && isHinted -> Teal400
-        feedback == Feedback.NONE -> MaterialTheme.colorScheme.outline
-        feedback == Feedback.CORRECT && imageChoice.isCorrect -> SuccessGreen
-        feedback == Feedback.INCORRECT && imageChoice.isCorrect -> SuccessGreen
-        else -> Color.Transparent
-    }
-    val borderWidth = when {
-        isSelected && feedback == Feedback.NONE -> 4.dp
-        isHinted && feedback == Feedback.NONE -> 4.dp
-        feedback != Feedback.NONE && imageChoice.isCorrect -> 4.dp
-        else -> 2.dp
-    }
-
-    val pulseAlpha by animateFloatAsState(
-        targetValue = if (isHinted) 0.6f else 1f,
-        animationSpec = tween(800),
-        label = "hintPulse",
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 0.94f else 1f,
+        animationSpec = tween(200),
+        label = "tileScale",
     )
 
-    Box(
+    val borderColor: Color
+    val borderW: androidx.compose.ui.unit.Dp
+
+    when {
+        feedback != Feedback.NONE && imageChoice.isCorrect -> {
+            borderColor = SuccessGreen; borderW = 4.dp
+        }
+        feedback != Feedback.NONE && isSelected && !imageChoice.isCorrect -> {
+            borderColor = ErrorRed; borderW = 4.dp
+        }
+        isHinted && enabled -> {
+            borderColor = Teal400; borderW = 4.dp
+        }
+        isSelected && enabled -> {
+            borderColor = Orange500; borderW = 4.dp
+        }
+        else -> {
+            borderColor = Color.Transparent; borderW = 0.dp
+        }
+    }
+
+    val elev = when {
+        isSelected && enabled -> 6.dp
+        isHinted && enabled -> 8.dp
+        else -> 3.dp
+    }
+
+    Card(
         modifier = Modifier
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(16.dp))
-            .border(borderWidth, borderColor.copy(alpha = pulseAlpha), RoundedCornerShape(16.dp))
-            .clickable(enabled = enabled) { onClick() },
-        contentAlignment = Alignment.Center,
+            .scale(scale)
+            .then(if (borderW > 0.dp) Modifier.border(borderW, borderColor, RoundedCornerShape(18.dp)) else Modifier),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = elev),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        onClick = { if (enabled) onClick() },
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(File(imageChoice.path))
-                .crossfade(true)
-                .build(),
-            contentDescription = "Image",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize(),
-        )
+        Box(modifier = Modifier.fillMaxSize().padding(5.dp), contentAlignment = Alignment.Center) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(File(imageChoice.path)).crossfade(true).build(),
+                contentDescription = "Image",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(14.dp)),
+            )
 
-        // Hint indicator — small ✨ badge
-        if (isHinted && feedback == Feedback.NONE) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(28.dp)
-                    .background(Teal400, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("✨", fontSize = 14.sp)
+            // Hint sparkle badge
+            if (isHinted && enabled) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .size(30.dp).clip(CircleShape).background(Teal400),
+                    contentAlignment = Alignment.Center,
+                ) { Text("✨", fontSize = 14.sp) }
             }
-        }
 
-        // Selection checkmark overlay
-        if (isSelected && feedback == Feedback.NONE) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(28.dp)
-                    .background(Orange500, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = "Selected",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp),
-                )
+            // Selection check
+            if (isSelected && enabled) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .size(30.dp).clip(CircleShape).background(Orange500),
+                    contentAlignment = Alignment.Center,
+                ) { Text("✓", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.Bold) }
+            }
+
+            // Correct/incorrect overlay icon
+            if (feedback != Feedback.NONE) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
+                        .size(30.dp).clip(CircleShape)
+                        .background(if (imageChoice.isCorrect) SuccessGreen else ErrorRed),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(if (imageChoice.isCorrect) "✓" else "✗", fontSize = 16.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun FeedbackBadge(text: String, color: Color) {
+private fun AnswerBubble(word: String, language: String) {
+    val langEmoji = when (language) { "ja" -> "🇯🇵"; "en" -> "🇬🇧"; else -> "🗣️" }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Orange100.copy(alpha = 0.5f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(langEmoji, fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(word, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Orange500, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+private fun FeedbackPill(text: String, color: Color) {
     Box(
         modifier = Modifier
             .padding(top = 8.dp)
-            .background(color, RoundedCornerShape(16.dp))
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .shadow(4.dp, RoundedCornerShape(20.dp))
+            .background(color, RoundedCornerShape(20.dp))
+            .padding(horizontal = 22.dp, vertical = 10.dp),
     ) {
-        Text(text, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text(text, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
 
 @Composable
-private fun SelfAssessButton(
-    emoji: String,
-    label: String,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun SelfAssessChip(
+    emoji: String, label: String, color: Color, points: Float,
+    viewModel: GameViewModel, modifier: Modifier = Modifier,
 ) {
     Button(
-        onClick = onClick,
-        modifier = modifier.height(72.dp),
+        onClick = { viewModel.selfAssess(points) },
+        modifier = modifier.height(68.dp),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(containerColor = color),
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(emoji, fontSize = 28.sp)
+            Text(emoji, fontSize = 26.sp)
             Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
         }
     }
 }
 
 @Composable
+private fun ToggleRow(
+    leftLabel: String, rightLabel: String, checked: Boolean, onToggle: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(leftLabel, fontSize = 11.sp, color = if (!checked) Orange500 else MediumText, fontWeight = if (!checked) FontWeight.Bold else FontWeight.Normal)
+        Spacer(modifier = Modifier.width(6.dp))
+        FilterChip(
+            selected = checked,
+            onClick = { onToggle(!checked) },
+            label = {},
+            modifier = Modifier.height(28.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                selectedContainerColor = Teal400,
+            ),
+            leadingIcon = if (checked) {{ Text("✓", fontSize = 12.sp, color = Color.White) }} else null,
+        )
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(rightLabel, fontSize = 11.sp, color = if (checked) Teal400 else MediumText, fontWeight = if (checked) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+@Composable
 private fun HelperCharacter(
-    showHint: Boolean,
-    hintIndex: Int?,
-    images: List<ImageChoice>,
-    cols: Int,
-    feedback: Feedback,
+    showHint: Boolean, hintIndex: Int?, images: List<ImageChoice>, cols: Int, feedback: Feedback,
 ) {
     val transition = rememberInfiniteTransition(label = "bounce")
     val bounce by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = -6f,
+        initialValue = 0f, targetValue = -5f,
         animationSpec = infiniteRepeatable(tween(600), repeatMode = RepeatMode.Reverse),
         label = "bounceY",
     )
 
     val canHint = showHint && feedback == Feedback.NONE && hintIndex != null && images.isNotEmpty()
-    val posText = if (canHint) positionLabel(hintIndex!!, cols) else ""
-    val arrow = if (canHint) positionArrow(hintIndex!!, cols) else ""
 
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Chat bubble
-        AnimatedVisibility(visible = canHint) {
+        AnimatedVisibility(visible = canHint, enter = fadeIn() + scaleIn()) {
             Box(
                 modifier = Modifier
-                    .background(Color.White, RoundedCornerShape(16.dp))
-                    .border(2.dp, Teal400, RoundedCornerShape(16.dp))
-                    .padding(12.dp),
+                    .background(Color.White, RoundedCornerShape(14.dp))
+                    .border(2.dp, Teal400, RoundedCornerShape(14.dp))
+                    .padding(10.dp),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("I think it's...", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = DarkText)
                     Text(
-                        "I think it may be...",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        "the $posText one! $arrow",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Teal400,
+                        "the ${positionLabel(hintIndex ?: 0, cols)} one! ${positionArrow(hintIndex ?: 0, cols)}",
+                        fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Teal400,
                     )
                 }
             }
         }
-
-        // Character
         Text(
-            text = if (canHint) "🤔" else "😊",
-            fontSize = 40.sp,
+            text = when {
+                feedback == Feedback.CORRECT -> "🎉"
+                feedback == Feedback.INCORRECT -> "😢"
+                canHint -> "🤔"
+                else -> "😊"
+            },
+            fontSize = 34.sp,
             modifier = Modifier.offset(y = bounce.dp),
         )
+    }
+}
 
-        if (feedback == Feedback.CORRECT) {
-            Text("🎉", fontSize = 32.sp)
-        } else if (feedback == Feedback.INCORRECT) {
-            Text("😢", fontSize = 32.sp)
+@Composable
+private fun ScoreCard(score: Float, maxScore: Float, attempts: Int) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Your Score", fontSize = 16.sp, color = MediumText, fontWeight = FontWeight.SemiBold)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "${"%.1f".format(score)} / ${"%.1f".format(maxScore)}",
+                fontSize = 36.sp, fontWeight = FontWeight.ExtraBold, color = Orange500,
+            )
+            if (attempts > 0) {
+                Text("$attempts attempt${if (attempts > 1) "s" else ""}", fontSize = 14.sp, color = MediumText)
+            }
         }
     }
 }
 
+@Composable
+private fun CelebrationOverlay() {
+    val particles = remember {
+        listOf("⭐", "🌟", "✨", "🎉", "🎊", "💫", "🌈", "🎈")
+    }
+    Row(
+        modifier = Modifier.fillMaxSize().padding(20.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        for ((i, emoji) in particles.withIndex()) {
+            val yAnim by rememberInfiniteTransition(label = "celebrate$i").animateFloat(
+                initialValue = 0f, targetValue = -40f,
+                animationSpec = infiniteRepeatable(
+                    tween(600 + i * 80, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "float$i",
+            )
+            Text(emoji, fontSize = (24 + i % 4 * 6).sp, modifier = Modifier.offset(y = yAnim.dp))
+        }
+    }
+}
+
+// ---- Position helpers for hint ----
+
+private fun parseImages(json: String): List<ImageChoice> {
+    return try {
+        val arr = JSONArray(json)
+        (0 until arr.length()).map { i ->
+            val obj = arr.getJSONObject(i)
+            ImageChoice(path = obj.getString("path"), isCorrect = obj.getBoolean("correct"))
+        }
+    } catch (_: Exception) { emptyList() }
+}
+
 private fun positionLabel(index: Int, cols: Int): String {
-    val row = index / cols
-    val col = index % cols
+    val row = index / cols; val col = index % cols
     val rowLabel = when (row) { 0 -> "top"; 1 -> "bottom"; else -> "middle" }
     val colLabel = when {
-        cols == 2 && col == 0 -> "left"
-        cols == 2 -> "right"
-        col == 0 -> "left"
-        col == cols - 1 -> "right"
-        else -> "middle"
+        cols == 2 && col == 0 -> "left"; cols == 2 -> "right"
+        col == 0 -> "left"; col == cols - 1 -> "right"; else -> "middle"
     }
     return if (cols == 1) rowLabel else "$rowLabel-$colLabel"
 }
 
 private fun positionArrow(index: Int, cols: Int): String {
-    val col = index % cols
-    val row = index / cols
+    val col = index % cols; val row = index / cols
     return when {
         cols == 1 -> "👇"
-        row == 0 && col == 0 -> "👆"
-        row == 0 && col == cols - 1 -> "👆"
-        row > 0 && col == 0 -> "👇"
-        row > 0 && col == cols - 1 -> "👇"
-        col < cols / 2 -> "👈"
-        else -> "👉"
+        row == 0 && col == 0 -> "👆"; row == 0 && col == cols - 1 -> "👆"
+        row > 0 && col == 0 -> "👇"; row > 0 && col == cols - 1 -> "👇"
+        col < cols / 2 -> "👈"; else -> "👉"
     }
 }
